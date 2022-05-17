@@ -1,0 +1,46 @@
+{
+  "name": "@hexlet/code",
+  "version": "1.0.0",
+  "description": "[![Actions Status](https://github.com/ishchts/js-testing-project-lvl1/workflows/hexlet-check/badge.svg)](https://github.com/ishchts/js-testing-project-lvl1/actions)",
+  "main": "src/loader.js",
+  "scripts": {
+    "test": "npx jest"
+  },
+  "bin": {
+    "page-loader": "./bin/page-loader.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ishchts/js-testing-project-lvl1.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ishchts/js-testing-project-lvl1/issues"
+  },
+  "homepage": "https://github.com/ishchts/js-testing-project-lvl1#readme",
+  "engines": {
+    "node": ">=14"
+  },
+  "dependencies": {
+    "axios": "0.27.2",
+    "cheerio": "1.0.0-rc.10",
+    "commander": "9.2.0",
+    "debug": "4.3.4"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.17.10",
+    "@babel/core": "^7.17.12",
+    "@babel/node": "^7.17.10",
+    "@babel/preset-env": "^7.17.12",
+    "@types/cheerio": "0.22.31",
+    "@types/jest": "^27.5.1",
+    "babel-jest": "28.1.0",
+    "eslint": "^8.15.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jest": "26.2.2",
+    "jest": "28.1.0",
+    "nock": "^13.2.4"
+  }
+}

@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe('positive cases', () => {
-  const resources = ['nodejs.png'];
+  const resources = ['nodejs.png', 'script.js', 'application.css'];
   let path;
 
   beforeEach(async () => {

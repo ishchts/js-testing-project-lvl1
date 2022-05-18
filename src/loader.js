@@ -71,7 +71,17 @@ export default async (url, path = '') => {
     (resource) => $(`img[src="${resource.originUrl}"]`).attr('src', resource.filePath),
   );
 
-  await Promise.all([imgs]);
+  const scripts = loadResources(
+    () => $('script').map((i, el) => $(el).attr('src')).toArray(),
+    (resource) => $(`script[src="${resource.originUrl}"]`).attr('src', resource.filePath),
+  );
+
+  const links = loadResources(
+    () => $('link').map((i, el) => $(el).attr('href')).toArray(),
+    (resource) => $(`link[href="${resource.originUrl}"]`).attr('href', resource.filePath),
+  );
+
+  await Promise.all([imgs, scripts, links]);
 
   const filePath = join(basePath, toFileName(baseUrl));
   await saveToFile(filePath, $.html());

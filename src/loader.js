@@ -83,7 +83,7 @@ export default async (url, path = '') => {
 
   await Promise.all([imgs, scripts, links]);
 
-  const filePath = join(basePath, toFileName(baseUrl));
-  await saveToFile(filePath, $.html());
-  return filePath;
+  const filepath = join(basePath, toFileName(baseUrl));
+  await saveToFile(filepath, $.html());
+  return { filepath };
 };

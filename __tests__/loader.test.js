@@ -34,9 +34,10 @@ describe('positive cases', () => {
   test('loader', async () => {
     const loadedHtml = await readFixture('expected', 'site.html');
     const result = await pageLoader('https://ru.hexlet.io/courses', path);
-    const readResult = await readFile(result, 'utf-8');
 
-    expect(result).toEqual(join(path, 'ru-hexlet-io-courses.html'));
+    const readResult = await readFile(result.filepath, 'utf-8');
+
+    expect(result).toEqual({ filepath: join(path, 'ru-hexlet-io-courses.html') });
     expect(readResult).toEqual(loadedHtml);
   });
 });

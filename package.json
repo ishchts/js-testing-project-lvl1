@@ -7,7 +7,7 @@
     "test": "npx jest"
   },
   "bin": {
-    "page-loader": "./bin/page-loader.js"
+    "page-loader": "bin/page-loader.js"
   },
   "repository": {
     "type": "git",

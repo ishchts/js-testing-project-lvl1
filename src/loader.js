@@ -1,89 +1,84 @@
+import { promises as fs } from 'fs';
 import axios from 'axios';
+import { URL } from 'url';
+import _ from 'lodash';
+import path from 'path';
 import cheerio from 'cheerio';
-import { join, parse, dirname } from 'path';
-import { writeFile, mkdir } from 'fs/promises';
 import debug from 'debug';
+
+import { urlToDirname, urlToFilename } from './utils';
 
 const log = debug('page-loader');
 
-let baseUrl;
-let basePath;
-
-const toFileName = (uri) => {
-  const url = new URL(uri);
-  const ext = parse(url.pathname).ext || '.html';
-  const fileName = [url.host, url.pathname.replace(ext, '')]
-    .filter((el) => el !== '/')
-    .join('')
-    .replace(/\W/g, '-');
-
-  return [fileName, ext].join('');
+const attributeMapping = {
+  link: 'href',
+  script: 'src',
+  img: 'src',
 };
 
-const saveToFile = async (filePath, content) => {
-  try {
-    await writeFile(filePath, content);
-    log('file %s saved', filePath);
-  } catch (e) {
-    if (e.code !== 'ENOENT') {
-      throw e;
-    }
+const prepareAssets = (website, baseDirname, html) => {
+  const $ = cheerio.load(html, { decodeEntities: false });
+  const assets = [];
+  Object.entries(attributeMapping).forEach(([tagName, attrName]) => {
+    const $elements = $(tagName).toArray();
+    const elementsWithUrls = $elements.map((element) => $(element))
+      .filter(($element) => $element.attr(attrName))
+      .map(($element) => ({ $element, url: new URL($element.attr(attrName), website) }))
+      .filter(({ url }) => url.origin === website);
 
-    await mkdir(dirname(filePath), { recursive: true });
-    await saveToFile(filePath, content);
-  }
+    elementsWithUrls.forEach(({ $element, url }) => {
+      const slug = urlToFilename(`${url.hostname}${url.pathname}`);
+      const filepath = path.join(baseDirname, slug);
+      assets.push({ url, filename: slug });
+      $element.attr(attrName, filepath);
+    });
+  });
+
+  return { html: $.html(), assets };
 };
 
-const toResource = (url) => ({
-  originUrl: url,
-  url: new URL(url, new URL(baseUrl).origin),
-  filePath: undefined,
-});
+const downloadAsset = (dirname, { url, filename }) => (
+  // Все данные качаются как бинарные, это позволяет одинаково качать и картинки и текст
+  // Скачка и сохранение ускоряют процесс. Можно сначала все скачать, а потом все сохранять,
+  // но это не эффективно. Тут это важно, потому что данные качаются медленно.
+  axios.get(url.toString(), { responseType: 'arraybuffer' })
+    .then((response) => {
+      const fullPath = path.join(dirname, filename);
+      return fs.writeFile(fullPath, response.data);
+    })
+);
 
-const resourceIsLocal = (resource) => new URL(baseUrl).host === resource.url.host;
+export default (pageUrl, outputDirname = '') => {
+  log('url', pageUrl);
+  log('output', outputDirname);
+  const url = new URL(pageUrl);
+  const slug = `${url.hostname}${url.pathname}`;
+  const filename = urlToFilename(slug);
+  const fullOutputDirname = path.resolve(process.cwd(), outputDirname);
+  const fullOutputFilename = path.join(fullOutputDirname, filename);
+  const assetsDirname = urlToDirname(slug);
+  const fullOutputAssetsDirname = path.join(fullOutputDirname, assetsDirname);
 
-const loadResource = async (resource) => {
-  const { data: content } = await axios.get(resource.url.href, { responseType: 'arraybuffer' });
-  const filePath = join(toFileName(baseUrl).replace('.html', '_files'), toFileName(resource.url.href));
-  await saveToFile(join(basePath, filePath), content);
-  return { ...resource, filePath };
-};
+  let data;
+  const promise = axios.get(pageUrl)
+    .then((response) => {
+      data = prepareAssets(url.origin, assetsDirname, response.data);
+      log('create (if not exists) directory for assets', fullOutputAssetsDirname);
+      return fs.access(fullOutputAssetsDirname)
+        .catch(() => fs.mkdir(fullOutputAssetsDirname));
+    })
+    .then(() => {
+      log('write html file', fullOutputFilename);
+      return fs.writeFile(fullOutputFilename, data.html);
+    })
+    .then(() => {
+      const tasks = data.assets.map((asset) => {
+        log('asset', asset.url.toString(), asset.filename);
+        return downloadAsset(fullOutputAssetsDirname, asset).catch(_.noop);
+      });
+      return Promise.all(tasks);
+    })
+    .then(() => ({ filepath: fullOutputFilename }));
 
-const loadResources = async (getResourceUrls, replaceContent) => {
-  const resources = getResourceUrls()
-    .map((url) => toResource(url))
-    .filter((resource) => resourceIsLocal(resource));
-
-  const loadedResources = await Promise.all(resources.map(
-    async (resource) => loadResource(resource),
-  ));
-  loadedResources.forEach((resource) => replaceContent(resource));
-};
-
-export default async (url, path = '') => {
-  baseUrl = url;
-  basePath = path;
-  const { data: content } = await axios.get(baseUrl);
-  const $ = cheerio.load(content);
-
-  const imgs = loadResources(
-    () => $('img').map((i, el) => $(el).attr('src')).toArray(),
-    (resource) => $(`img[src="${resource.originUrl}"]`).attr('src', resource.filePath),
-  );
-
-  const scripts = loadResources(
-    () => $('script').map((i, el) => $(el).attr('src')).toArray(),
-    (resource) => $(`script[src="${resource.originUrl}"]`).attr('src', resource.filePath),
-  );
-
-  const links = loadResources(
-    () => $('link').map((i, el) => $(el).attr('href')).toArray(),
-    (resource) => $(`link[href="${resource.originUrl}"]`).attr('href', resource.filePath),
-  );
-
-  await Promise.all([imgs, scripts, links]);
-
-  const filepath = join(basePath, toFileName(baseUrl));
-  await saveToFile(filepath, $.html());
-  return { filepath };
+  return promise;
 };
